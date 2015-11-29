@@ -1,0 +1,30 @@
+{
+  "name": "seq-emitter",
+  "description": "EventEmitter for sequencer",
+  "version": "0.0.0",
+  "author": "Nao Yonamine <mohayonao@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/mohayonao/seq-emitter/issues"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "files": [
+    "package.json",
+    "README.md",
+    "index.js",
+    "lib"
+  ],
+  "homepage": "http://mohayonao.github.io/seq-emitter/",
+  "keywords": [
+    "emitter",
+    "event",
+    "sequencer"
+  ],
+  "license": "MIT",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/mohayonao/seq-emitter.git"
+  },
+  "scripts": {}
+}

@@ -13,8 +13,11 @@
     "eslint": "^1.10.1",
     "espower-babel": "^3.3.0",
     "isparta": "^3.5.3",
+    "lodash.pick": "^3.1.0",
     "mocha": "^2.3.4",
-    "power-assert": "^1.2.0"
+    "power-assert": "^1.2.0",
+    "sinon": "^1.17.2",
+    "tickable-timer": "^0.3.0"
   },
   "files": [
     "package.json",

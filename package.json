@@ -6,7 +6,11 @@
   "bugs": {
     "url": "https://github.com/mohayonao/seq-emitter/issues"
   },
-  "dependencies": {},
+  "dependencies": {
+    "interval-iterator": "^0.1.0",
+    "object-assign": "^4.0.1",
+    "web-audio-scheduler": "^1.0.0"
+  },
   "devDependencies": {
     "babel": "^5.8.34",
     "babel-eslint": "^4.1.5",

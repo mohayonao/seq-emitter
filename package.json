@@ -1,13 +1,13 @@
 {
   "name": "seq-emitter",
-  "description": "EventEmitter for sequencer",
-  "version": "1.0.0",
+  "description": "EventEmitter for Web Audio API sequencer",
+  "version": "1.1.0",
   "author": "Nao Yonamine <mohayonao@gmail.com>",
   "bugs": {
     "url": "https://github.com/mohayonao/seq-emitter/issues"
   },
   "dependencies": {
-    "interval-iterator": "^0.1.0",
+    "interval-iterator": "^1.0.0",
     "object-assign": "^4.0.1",
     "web-audio-scheduler": "^1.0.0"
   },
@@ -15,9 +15,9 @@
     "babel": "^5.8.34",
     "babel-eslint": "^4.1.5",
     "eslint": "^1.10.1",
+    "eslint-config-mohayonao": "^0.1.0",
     "espower-babel": "^3.3.0",
     "isparta": "^3.5.3",
-    "lodash.pick": "^3.1.0",
     "mocha": "^2.3.4",
     "power-assert": "^1.2.0",
     "sinon": "^1.17.2",

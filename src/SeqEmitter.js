@@ -11,18 +11,53 @@ export default class SeqEmitter extends EventEmitter {
     this._tracks = tracks.map((track, trackNumber) => {
       return new TrackIterator(track, this._scheduler.interval, trackNumber);
     });
-    this._startTime = 0;
+    this._startTime = -1;
+    this._stopTime = -1;
+    this._timerId = 0;
+    this._state = "suspended";
   }
 
-  start() {
-    this._startTime = this._scheduler.currentTime;
-    this._scheduler.start((e) => {
-      this._process(e.playbackTime);
-    });
+  get state() {
+    return this._state;
   }
 
-  stop() {
-    this._scheduler.stop(true);
+  start(t0 = this._scheduler.currentTime) {
+    /* istanbul ignore else */
+    if (this._startTime === -1) {
+      this._startTime = t0;
+      this._scheduler.start();
+      this._timerId = this._scheduler.insert(t0, (e) => {
+        this._state = "running";
+        this.emit("statechange", { type: "statechange", playbackTime: t0, state: this._state });
+        this._process(e.playbackTime);
+      });
+    } else {
+      /* eslint no-lonely-if: 0 */
+      if (this._startTime !== -1) {
+        global.console.warn("Failed to execute 'start' on SeqEmitter: cannot call start more than once.");
+      }
+    }
+  }
+
+  stop(t0 = this._scheduler.currentTime) {
+    /* istanbul ignore else */
+    if (this._startTime !== -1 && this._stopTime === -1) {
+      this._stopTime = t0;
+      this._scheduler.insert(t0, () => {
+        this._state = "closed";
+        this.emit("statechange", { type: "statechange", playbackTime: t0, state: this._state });
+        this._scheduler.stop();
+        this._scheduler.remove(this._timerId);
+        this._timerId = 0;
+      });
+    } else {
+      if (this._startTime === -1) {
+        global.console.warn("Failed to execute 'stop' on SeqEmitter: cannot call stop without calling start first.");
+      }
+      if (this._stopTime !== -1) {
+        global.console.warn("Failed to execute 'stop' on SeqEmitter: cannot call stop more than once.");
+      }
+    }
   }
 
   _process(playbackTime) {
@@ -30,20 +65,16 @@ export default class SeqEmitter extends EventEmitter {
       let iterItem = iter.next();
 
       this._emitEvent(iterItem.value, iter.trackNumber);
-
-      if (iterItem.done) {
-        iter.done = true;
-      }
     });
 
     this._tracks = this._tracks.filter(iter => !iter.done);
 
     if (this._tracks.length === 0) {
-      this.emit("end", { type: "end", playbackTime });
+      this.emit("end:all", { type: "end:all", playbackTime });
     } else {
       let nextPlaybackTime = playbackTime + this._scheduler.interval;
 
-      this._scheduler.insert(nextPlaybackTime, (e) => {
+      this._timerId = this._scheduler.insert(nextPlaybackTime, (e) => {
         this._process(e.playbackTime);
       });
     }
@@ -51,10 +82,12 @@ export default class SeqEmitter extends EventEmitter {
 
   _emitEvent(events, trackNumber) {
     events.forEach((items) => {
-      let type = items.noteNumber != null ? "note" : "ctrl";
+      let type = items.type;
       let playbackTime = this._startTime + items.time;
 
-      this.emit(type, assign({ type, playbackTime, trackNumber }, items));
+      if (typeof type === "string") {
+        this.emit(type, assign({ playbackTime, trackNumber }, items));
+      }
     });
   }
 }

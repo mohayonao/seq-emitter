@@ -1,7 +1,7 @@
 {
   "name": "seq-emitter",
-  "description": "EventEmitter for sequencer",
-  "version": "1.0.0",
+  "description": "EventEmitter for Web Audio API sequencer",
+  "version": "1.1.0",
   "author": "Nao Yonamine <mohayonao@gmail.com>",
   "bugs": {
     "url": "https://github.com/mohayonao/seq-emitter/issues"

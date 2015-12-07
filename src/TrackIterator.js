@@ -7,4 +7,16 @@ export default class TrackIterator extends IntervalIterator {
     this.trackNumber = trackNumber;
     this.done = false;
   }
+
+  next() {
+    if (this.done) {
+      return { done: true, value: [] };
+    }
+
+    let iterItem = super.next();
+
+    this.done = iterItem.done;
+
+    return iterItem;
+  }
 }

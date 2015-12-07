@@ -36,10 +36,6 @@ export default class SeqEmitter extends EventEmitter {
       let iterItem = iter.next();
 
       this._emitEvent(iterItem.value, iter.trackNumber);
-
-      if (iterItem.done) {
-        iter.done = true;
-      }
     });
 
     this._tracks = this._tracks.filter(iter => !iter.done);

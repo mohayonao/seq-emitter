@@ -12,17 +12,23 @@ export default class SeqEmitter extends EventEmitter {
       return new TrackIterator(track, this._scheduler.interval, trackNumber);
     });
     this._startTime = 0;
+    this._timerId = 0;
   }
 
-  start() {
-    this._startTime = this._scheduler.currentTime;
-    this._scheduler.start((e) => {
+  start(t0 = this._scheduler.currentTime) {
+    this._startTime = t0;
+    this._scheduler.start();
+    this._timerId = this._scheduler.insert(t0, (e) => {
       this._process(e.playbackTime);
     });
   }
 
-  stop() {
-    this._scheduler.stop(true);
+  stop(t0 = this._scheduler.currentTime) {
+    this._scheduler.insert(t0, () => {
+      this._scheduler.stop();
+      this._scheduler.remove(this._timerId);
+      this._timerId = 0;
+    });
   }
 
   _process(playbackTime) {
@@ -39,11 +45,11 @@ export default class SeqEmitter extends EventEmitter {
     this._tracks = this._tracks.filter(iter => !iter.done);
 
     if (this._tracks.length === 0) {
-      this.emit("end", { type: "end", playbackTime });
+      this.emit("end:all", { type: "end:all", playbackTime });
     } else {
       let nextPlaybackTime = playbackTime + this._scheduler.interval;
 
-      this._scheduler.insert(nextPlaybackTime, (e) => {
+      this._timerId = this._scheduler.insert(nextPlaybackTime, (e) => {
         this._process(e.playbackTime);
       });
     }
@@ -51,10 +57,12 @@ export default class SeqEmitter extends EventEmitter {
 
   _emitEvent(events, trackNumber) {
     events.forEach((items) => {
-      let type = items.noteNumber != null ? "note" : "ctrl";
+      let type = items.type;
       let playbackTime = this._startTime + items.time;
 
-      this.emit(type, assign({ type, playbackTime, trackNumber }, items));
+      if (typeof type === "string") {
+        this.emit(type, assign({ playbackTime, trackNumber }, items));
+      }
     });
   }
 }

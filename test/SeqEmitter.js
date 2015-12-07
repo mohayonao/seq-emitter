@@ -26,7 +26,7 @@ describe("SeqEmitter", () => {
     global.Date = {
       now() {
         return timestamp;
-      }
+      },
     };
   });
   beforeEach(() => {
@@ -48,7 +48,7 @@ describe("SeqEmitter", () => {
       assert(emitter instanceof SeqEmitter);
     });
   });
-  describe("#start(): void", () => {
+  describe("#start([ t0: number ]): void", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
 
@@ -57,7 +57,7 @@ describe("SeqEmitter", () => {
       });
     });
   });
-  describe("#stop(): void", () => {
+  describe("#stop([ t0: number ]): void", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
 
@@ -70,40 +70,48 @@ describe("SeqEmitter", () => {
     it("works", () => {
       let tracks = [
         [
-          { time: 0.00, duration: 0.5, noteNumber: 60 },
-          { time: 0.50, duration: 0.5, noteNumber: 64 },
-          { time: 1.00, duration: 0.5, noteNumber: 67 },
-          { time: 1.25, duration: 0.0 }
+          { type: "note", time: 0.00, duration: 0.5, noteNumber: 60 },
+          { type: "note", time: 0.50, duration: 0.5, noteNumber: 64 },
+          { type: "note", time: 1.00, duration: 0.5, noteNumber: 67 },
+          { type: "ctrl", time: 1.25, duration: 0.0 },
+          { type: "end", time: 1.5 },
         ],
         [
-          { time: 0.00, duration: 0.25, noteNumber: 57 },
-          { time: 0.25, duration: 0.25, noteNumber: 57 },
-          { time: 0.50, duration: 0.25, noteNumber: 57 },
-          { time: 1.00, duration: 0.25, noteNumber: 55 }
-        ]
+          { type: "note", time: 0.00, duration: 0.25, noteNumber: 57 },
+          { type: "note", time: 0.25, duration: 0.25, noteNumber: 57 },
+          { type: "note", time: 0.50, duration: 0.25, noteNumber: 57 },
+          { type: "note", time: 1.00, duration: 0.25, noteNumber: 55 },
+          { time: 1.5 },
+        ],
       ].map(track => track[Symbol.iterator]());
 
       let emitter = new SeqEmitter(tracks, { timerAPI: tickable, interval: 0.25 });
       let onNote = sinon.spy();
       let onCtrl = sinon.spy();
       let onEnd = sinon.spy();
+      let onEndAll = sinon.spy();
 
       function resetSpies() {
         onNote.reset();
         onCtrl.reset();
         onEnd.reset();
+        onEndAll.reset();
       }
 
-      tickable.tick(1000);
       emitter.on("note", onNote);
       emitter.on("ctrl", onCtrl);
       emitter.on("end", onEnd);
-      emitter.start();
+      emitter.on("end:all", onEndAll);
+      emitter.start(1);
+      emitter.stop(3);
+
+      tickable.tick(1000);
 
       tickable.tick(250);
       assert(onNote.callCount === 3);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
       assert.deepEqual(pick(onNote.args[0][0]), noteEvent(1.000, 0, 0.000, 60));
       assert.deepEqual(pick(onNote.args[1][0]), noteEvent(1.000, 1, 0.000, 57));
       assert.deepEqual(pick(onNote.args[2][0]), noteEvent(1.250, 1, 0.250, 57));
@@ -113,6 +121,7 @@ describe("SeqEmitter", () => {
       assert(onNote.callCount === 2);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
       assert.deepEqual(pick(onNote.args[0][0]), noteEvent(1.500, 0, 0.500, 64));
       assert.deepEqual(pick(onNote.args[1][0]), noteEvent(1.500, 1, 0.500, 57));
       resetSpies();
@@ -121,12 +130,14 @@ describe("SeqEmitter", () => {
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
       resetSpies();
 
       tickable.tick(250);
       assert(onNote.callCount === 2);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
       assert.deepEqual(pick(onNote.args[0][0]), noteEvent(2.000, 0, 1.000, 67));
       assert.deepEqual(pick(onNote.args[1][0]), noteEvent(2.000, 1, 1.000, 55));
       resetSpies();
@@ -135,6 +146,7 @@ describe("SeqEmitter", () => {
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 1);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
       assert.deepEqual(pick(onCtrl.args[0][0]), ctrlEvent(2.250, 0, 1.250));
       resetSpies();
 
@@ -142,13 +154,22 @@ describe("SeqEmitter", () => {
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 1);
-      assert.deepEqual(onEnd.args[0][0], { type: "end", playbackTime: 2.5 });
+      assert.deepEqual(onEnd.args[0][0], { type: "end", playbackTime: 2.5, trackNumber: 0, time: 1.5 });
       resetSpies();
 
       tickable.tick(250);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 1);
+      assert.deepEqual(onEndAll.args[0][0], { type: "end:all", playbackTime: 2.75 });
+      resetSpies();
+
+      tickable.tick(250);
+      assert(onNote.callCount === 0);
+      assert(onCtrl.callCount === 0);
+      assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
     });
   });
 });

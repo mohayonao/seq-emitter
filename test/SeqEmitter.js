@@ -2,19 +2,6 @@ import assert from "power-assert";
 import sinon from "sinon";
 import tickable from "tickable-timer";
 import SeqEmitter from "../src/SeqEmitter";
-import _pick from "lodash.pick";
-
-function noteEvent(playbackTime, trackNumber, time, noteNumber) {
-  return { type: "note", playbackTime, trackNumber, time, noteNumber };
-}
-
-function ctrlEvent(playbackTime, trackNumber, time) {
-  return { type: "ctrl", playbackTime, trackNumber, time };
-}
-
-function pick(target) {
-  return _pick(target, [ "type", "playbackTime", "trackNumber", "time", "noteNumber" ]);
-}
 
 describe("SeqEmitter", () => {
   let BuiltInDate = Date;
@@ -48,6 +35,13 @@ describe("SeqEmitter", () => {
       assert(emitter instanceof SeqEmitter);
     });
   });
+  describe("#state: string", () => {
+    it("works", () => {
+      let emitter = new SeqEmitter([]);
+
+      assert(emitter.state === "suspended");
+    });
+  });
   describe("#start([ t0: number ]): void", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
@@ -61,6 +55,8 @@ describe("SeqEmitter", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
 
+      emitter.start();
+
       assert.doesNotThrow(() => {
         emitter.stop();
       });
@@ -70,34 +66,37 @@ describe("SeqEmitter", () => {
     it("works", () => {
       let tracks = [
         [
-          { type: "note", time: 0.00, duration: 0.5, noteNumber: 60 },
-          { type: "note", time: 0.50, duration: 0.5, noteNumber: 64 },
-          { type: "note", time: 1.00, duration: 0.5, noteNumber: 67 },
-          { type: "ctrl", time: 1.25, duration: 0.0 },
+          { type: "note", time: 0.00, noteNumber: 60 },
+          { type: "note", time: 0.50, noteNumber: 64 },
+          { type: "note", time: 1.00, noteNumber: 67 },
+          { type: "ctrl", time: 1.25 },
           { type: "end", time: 1.5 },
         ],
         [
-          { type: "note", time: 0.00, duration: 0.25, noteNumber: 57 },
-          { type: "note", time: 0.25, duration: 0.25, noteNumber: 57 },
-          { type: "note", time: 0.50, duration: 0.25, noteNumber: 57 },
-          { type: "note", time: 1.00, duration: 0.25, noteNumber: 55 },
+          { type: "note", time: 0.00, noteNumber: 57 },
+          { type: "note", time: 0.25, noteNumber: 57 },
+          { type: "note", time: 0.50, noteNumber: 57 },
+          { type: "note", time: 1.00, noteNumber: 55 },
           { time: 1.5 },
         ],
       ].map(track => track[Symbol.iterator]());
 
       let emitter = new SeqEmitter(tracks, { timerAPI: tickable, interval: 0.25 });
+      let onStateChange = sinon.spy();
       let onNote = sinon.spy();
       let onCtrl = sinon.spy();
       let onEnd = sinon.spy();
       let onEndAll = sinon.spy();
 
       function resetSpies() {
+        onStateChange.reset();
         onNote.reset();
         onCtrl.reset();
         onEnd.reset();
         onEndAll.reset();
       }
 
+      emitter.on("statechange", onStateChange);
       emitter.on("note", onNote);
       emitter.on("ctrl", onCtrl);
       emitter.on("end", onEnd);
@@ -106,27 +105,37 @@ describe("SeqEmitter", () => {
       emitter.stop(3);
 
       tickable.tick(1000);
-
-      tickable.tick(250);
-      assert(onNote.callCount === 3);
-      assert(onCtrl.callCount === 0);
-      assert(onEnd.callCount === 0);
-      assert(onEndAll.callCount === 0);
-      assert.deepEqual(pick(onNote.args[0][0]), noteEvent(1.000, 0, 0.000, 60));
-      assert.deepEqual(pick(onNote.args[1][0]), noteEvent(1.000, 1, 0.000, 57));
-      assert.deepEqual(pick(onNote.args[2][0]), noteEvent(1.250, 1, 0.250, 57));
-      resetSpies();
-
-      tickable.tick(250);
+      assert(onStateChange.callCount === 1);
       assert(onNote.callCount === 2);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
       assert(onEndAll.callCount === 0);
-      assert.deepEqual(pick(onNote.args[0][0]), noteEvent(1.500, 0, 0.500, 64));
-      assert.deepEqual(pick(onNote.args[1][0]), noteEvent(1.500, 1, 0.500, 57));
+      assert.deepEqual(onStateChange.args[0][0], { type: "statechange", playbackTime: 1, state: "running" });
+      assert.deepEqual(onNote.args[0][0], { type: "note", playbackTime: 1.000, trackNumber: 0, time: 0.000, noteNumber: 60 });
+      assert.deepEqual(onNote.args[1][0], { type: "note", playbackTime: 1.000, trackNumber: 1, time: 0.000, noteNumber: 57 });
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 0);
+      assert(onNote.callCount === 1);
+      assert(onCtrl.callCount === 0);
+      assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
+      assert.deepEqual(onNote.args[0][0], { type: "note", playbackTime: 1.250, trackNumber: 1, time: 0.250, noteNumber: 57 });
+      resetSpies();
+
+      tickable.tick(250);
+      assert(onStateChange.callCount === 0);
+      assert(onNote.callCount === 2);
+      assert(onCtrl.callCount === 0);
+      assert(onEnd.callCount === 0);
+      assert(onEndAll.callCount === 0);
+      assert.deepEqual(onNote.args[0][0], { type: "note", playbackTime: 1.500, trackNumber: 0, time: 0.500, noteNumber: 64 });
+      assert.deepEqual(onNote.args[1][0], { type: "note", playbackTime: 1.500, trackNumber: 1, time: 0.500, noteNumber: 57 });
+      resetSpies();
+
+      tickable.tick(250);
+      assert(onStateChange.callCount === 0);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
@@ -134,23 +143,26 @@ describe("SeqEmitter", () => {
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 0);
       assert(onNote.callCount === 2);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
       assert(onEndAll.callCount === 0);
-      assert.deepEqual(pick(onNote.args[0][0]), noteEvent(2.000, 0, 1.000, 67));
-      assert.deepEqual(pick(onNote.args[1][0]), noteEvent(2.000, 1, 1.000, 55));
+      assert.deepEqual(onNote.args[0][0], { type: "note", playbackTime: 2.000, trackNumber: 0, time: 1.000, noteNumber: 67 });
+      assert.deepEqual(onNote.args[1][0], { type: "note", playbackTime: 2.000, trackNumber: 1, time: 1.000, noteNumber: 55 });
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 0);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 1);
       assert(onEnd.callCount === 0);
       assert(onEndAll.callCount === 0);
-      assert.deepEqual(pick(onCtrl.args[0][0]), ctrlEvent(2.250, 0, 1.250));
+      assert.deepEqual(onCtrl.args[0][0], { type: "ctrl", playbackTime: 2.250, trackNumber: 0, time: 1.250 });
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 0);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 1);
@@ -158,6 +170,7 @@ describe("SeqEmitter", () => {
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 0);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
@@ -166,10 +179,12 @@ describe("SeqEmitter", () => {
       resetSpies();
 
       tickable.tick(250);
+      assert(onStateChange.callCount === 1);
       assert(onNote.callCount === 0);
       assert(onCtrl.callCount === 0);
       assert(onEnd.callCount === 0);
       assert(onEndAll.callCount === 0);
+      assert.deepEqual(onStateChange.args[0][0], { type: "statechange", playbackTime: 3, state: "closed" });
     });
   });
 });

@@ -1,20 +1,21 @@
 import assert from "power-assert";
 import sinon from "sinon";
 import tickable from "tickable-timer";
+import WebAudioScheduler from "web-audio-scheduler";
 import SeqEmitter from "../src/SeqEmitter";
 
 describe("SeqEmitter", () => {
   let BuiltInDate = Date;
+  let warn = global.console.warn;
   let timestamp = 0;
 
   before(() => {
     BuiltInDate = global.Date;
 
     global.Date = {
-      now() {
-        return timestamp;
-      },
+      now: () => timestamp,
     };
+    global.console.warn = () => {};
   });
   beforeEach(() => {
     timestamp = 0;
@@ -26,6 +27,7 @@ describe("SeqEmitter", () => {
   });
   after(() => {
     global.Date = BuiltInDate;
+    global.console.warn = warn;
   });
 
   describe("constructor(tracks: Iterator[], config = {})", () => {
@@ -33,6 +35,19 @@ describe("SeqEmitter", () => {
       let emitter = new SeqEmitter([]);
 
       assert(emitter instanceof SeqEmitter);
+    });
+  });
+  describe("#scheduler: string", () => {
+    it("works", () => {
+      let emitter = new SeqEmitter([]);
+
+      assert(emitter.scheduler instanceof WebAudioScheduler);
+    });
+    it("works with given scheduler", () => {
+      let scheduler = new WebAudioScheduler({ timerAPI: tickable });
+      let emitter = new SeqEmitter([], { scheduler: scheduler });
+
+      assert(emitter.scheduler === scheduler);
     });
   });
   describe("#state: string", () => {
@@ -46,20 +61,106 @@ describe("SeqEmitter", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
 
-      assert.doesNotThrow(() => {
-        emitter.start();
-      });
+      emitter.scheduler.start = sinon.spy();
+
+      emitter.start();
+
+      assert(emitter.scheduler.start.callCount === 1);
+      assert(emitter.scheduler.events.length === 1);
+    });
+    it("not work for call more than once", () => {
+      let emitter = new SeqEmitter([], { timerAPI: tickable });
+
+      emitter.scheduler.start = sinon.spy();
+
+      emitter.start();
+      emitter.start();
+
+      assert(emitter.scheduler.start.callCount === 1);
+      assert(emitter.scheduler.events.length === 1);
+    });
+    it("works with given scheduler", () => {
+      let scheduler = new WebAudioScheduler({ timerAPI: tickable });
+      let emitter = new SeqEmitter([], { scheduler: scheduler });
+
+      scheduler.start = sinon.spy(scheduler.start.bind(scheduler));
+
+      emitter.start();
+
+      assert(emitter.scheduler.start.callCount === 0);
+      assert(emitter.scheduler.events.length === 1);
     });
   });
   describe("#stop([ t0: number ]): void", () => {
     it("works", () => {
       let emitter = new SeqEmitter([], { timerAPI: tickable });
 
+      emitter.scheduler.start = sinon.spy(emitter.scheduler.start.bind(emitter.scheduler));
+      emitter.scheduler.stop = sinon.spy(emitter.scheduler.stop.bind(emitter.scheduler));
+
+      emitter.start();
+      emitter.stop();
+
+      assert(emitter.scheduler.stop.callCount === 0);
+      assert(emitter.scheduler.events.length === 2);
+
+      tickable.tick(1000);
+
+      assert(emitter.scheduler.stop.callCount === 1);
+      assert(emitter.scheduler.events.length === 0);
+    });
+    it("not work without start", () => {
+      let emitter = new SeqEmitter([], { timerAPI: tickable });
+
+      emitter.scheduler.start = sinon.spy(emitter.scheduler.start.bind(emitter.scheduler));
+      emitter.scheduler.stop = sinon.spy(emitter.scheduler.stop.bind(emitter.scheduler));
+
+      emitter.stop();
+
+      assert(emitter.scheduler.stop.callCount === 0);
+      assert(emitter.scheduler.events.length === 0);
+    });
+    it("not work for call more than once", () => {
+      let emitter = new SeqEmitter([], { timerAPI: tickable });
+
+      emitter.scheduler.start = sinon.spy(emitter.scheduler.start.bind(emitter.scheduler));
+      emitter.scheduler.stop = sinon.spy(emitter.scheduler.stop.bind(emitter.scheduler));
+
+      emitter.start();
+      emitter.stop();
+      emitter.stop();
+
+      assert(emitter.scheduler.stop.callCount === 0);
+      assert(emitter.scheduler.events.length === 2);
+
+      tickable.tick(1000);
+
+      assert(emitter.scheduler.stop.callCount === 1);
+      assert(emitter.scheduler.events.length === 0);
+    });
+    it("works with given scheduler", () => {
+      let scheduler = new WebAudioScheduler({ timerAPI: tickable });
+      let emitter = new SeqEmitter([], { scheduler: scheduler });
+
+      scheduler.start = sinon.spy(scheduler.start.bind(scheduler));
+      scheduler.stop = sinon.spy(scheduler.stop.bind(scheduler));
+
       emitter.start();
 
-      assert.doesNotThrow(() => {
-        emitter.stop();
-      });
+      assert(emitter.scheduler.start.callCount === 0);
+      assert(emitter.scheduler.events.length === 1);
+
+      scheduler.start();
+
+      emitter.stop();
+
+      assert(emitter.scheduler.stop.callCount === 0);
+      assert(emitter.scheduler.events.length === 2);
+
+      tickable.tick(1000);
+
+      assert(emitter.scheduler.stop.callCount === 0);
+      assert(emitter.scheduler.events.length === 0);
     });
   });
   describe("emit events", () => {

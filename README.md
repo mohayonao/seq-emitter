@@ -21,6 +21,7 @@ $ npm install seq-emitter
     - `config.timerAPI: global`
 
 #### Instance attribute
+- `scheduler: WebAudioScheduler`
 - `state: string`
   - `"suspended"`
   - `"running"`

@@ -7,7 +7,14 @@ export default class SeqEmitter extends EventEmitter {
   constructor(tracks, config = {}) {
     super();
 
-    this._scheduler = config.scheduler || new WebAudioScheduler(config);
+    if (config.scheduler) {
+      this._scheduler = config.scheduler;
+      this._ownScheduler = false;
+    } else {
+      this._scheduler = new WebAudioScheduler(config);
+      this._ownScheduler = true;
+    }
+
     this._tracks = tracks.map((track, trackNumber) => {
       return new TrackIterator(track, this._scheduler.interval, trackNumber);
     });
@@ -17,21 +24,27 @@ export default class SeqEmitter extends EventEmitter {
     this._state = "suspended";
   }
 
+  get scheduler() {
+    return this._scheduler;
+  }
+
   get state() {
     return this._state;
   }
 
   start(t0 = this._scheduler.currentTime) {
-    /* istanbul ignore else */
     if (this._startTime === -1) {
       this._startTime = t0;
-      this._scheduler.start();
+      if (this._ownScheduler) {
+        this._scheduler.start();
+      }
       this._timerId = this._scheduler.insert(t0, (e) => {
         this._state = "running";
         this.emit("statechange", { type: "statechange", playbackTime: t0, state: this._state });
         this._process(e.playbackTime);
       });
     } else {
+      /* istanbul ignore else */
       /* eslint no-lonely-if: 0 */
       if (this._startTime !== -1) {
         global.console.warn("Failed to execute 'start' on SeqEmitter: cannot call start more than once.");
@@ -40,13 +53,14 @@ export default class SeqEmitter extends EventEmitter {
   }
 
   stop(t0 = this._scheduler.currentTime) {
-    /* istanbul ignore else */
     if (this._startTime !== -1 && this._stopTime === -1) {
       this._stopTime = t0;
       this._scheduler.insert(t0, () => {
         this._state = "closed";
         this.emit("statechange", { type: "statechange", playbackTime: t0, state: this._state });
-        this._scheduler.stop();
+        if (this._ownScheduler) {
+          this._scheduler.stop();
+        }
         this._scheduler.remove(this._timerId);
         this._timerId = 0;
       });
